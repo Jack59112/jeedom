@@ -1,0 +1,65 @@
+# docker-compose.yml
+
+version: '3'
+
+services:
+  db:
+    image: mariadb:latest
+    command: 
+      - "--default-authentication-plugin=mysql_native_password"
+      - "--skip-name-resolve"
+      - "--key_buffer_size=16M"
+      - "--thread_cache_size=16"
+      - "--tmp_table_size=48M"
+      - "--max_heap_table_size=48M"
+      - "--query_cache_type=1"
+      - "--query_cache_size=32M"
+      - "--query_cache_limit=2M"
+      - "--query_cache_min_res_unit=3K"
+      - "--innodb_flush_method=O_DIRECT"
+      - "--innodb_flush_log_at_trx_commit=2"
+      - "--innodb_log_file_size=32M"
+      - "--innodb_large_prefix=on"
+      - "--connect_timeout=600"
+      - "--wait_timeout=600"
+      - "--interactive_timeout=600"
+    volumes:
+      - db:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    expose:
+      - 3306
+
+  http:
+    image: jeedom/jeedom:latest
+    volumes:
+      - http:/var/www/html
+      - ./init.sh:/usr/src/init.sh  # Montez le script d'initialisation
+    tmpfs:
+      - /tmp/jeedom
+    restart: always
+    command: sh -c "chmod +x /usr/src/init.sh && /usr/src/init.sh && apache2-foreground"  # Exécutez le script d'initialisation
+    ports:
+      - "${HTTP_PORT}:80"
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      HTTP_PORT: ${HTTP_PORT}
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-S", "--max-time", "2", "http://localhost:${HTTP_PORT}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      - db
+    network_mode: "host"
+
+volumes:
+  db:
+  http:
